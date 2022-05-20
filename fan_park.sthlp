@@ -96,8 +96,7 @@ Default is {cmd:num_quantiles(100)}{p_end}
 
 {title: Simulation Example}
 
-
-
+{p 8 8}{stata "do simulation_fan_park.do"}{p_end}
 
 
 {marker stored_results}{...}
