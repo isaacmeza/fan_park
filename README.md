@@ -12,5 +12,6 @@ net install fan_park, from(https://raw.githubusercontent.com/isaacmeza/fan_park/
 ```
 net get fan_park, from(https://raw.githubusercontent.com/isaacmeza/fan_park/main) replace
 ```
+- Help: [fan_park](fan_park.pdf)
 
 <br><br>
