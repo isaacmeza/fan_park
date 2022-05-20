@@ -7,7 +7,9 @@ The `fan_park` package provides Stata implementations of nonparametric estimator
 
 To install/update in Stata type:
 ```
-net install fan_park, from() replace
+net install fan_park, from(https://raw.githubusercontent.com/isaacmeza/fan_park/main) replace
+
+net get fan_park, from(https://raw.githubusercontent.com/isaacmeza/fan_park/main) replace
 ```
 
 <br><br>
