@@ -1,0 +1,6 @@
+v 3
+d FAN_PARK: Sharp Bounds on the Distribution of Treatment Effects.
+d           https://github.com/isaacmeza/fan_park
+d
+
+p fan_park

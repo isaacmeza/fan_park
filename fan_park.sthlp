@@ -32,7 +32,7 @@
 {marker description}{...}
 {title:Description}
 
-{p 4 8}{cmd:fan_park} implements nonparametric estimators of sharp bounds on the distribution of treatment effects of a binary treatment developed in {browse "https://doi.org/10.1017/S0266466609990168":Fan, and Park (2009)}, and provides inference on this bounds.{p_end}
+{p 4 8}{cmd:fan_park} implements nonparametric estimators of sharp bounds on the distribution of treatment effects of a binary treatment developed in {browse "https://doi.org/10.1017/S0266466609990168":Fan, and Park (2009)}, and provides inference for this bounds.{p_end}
 
 {p 8 8} Let Delta = Y_1-Y_0 denote the treatment effect or outcome gain, and F_{Delta}(.) its distribution function. Given the marginals F_1 and F_0 we can compute sharp bounds on the distribution of Delta for each x in the support of F_{Delta}, that is : F_L(x)<=F_{Delta}(x)<=F_U(x). Alternatively, when the option qbounds is given, {cmd:fan_park} computes bounds for the quantile function :  
 F_U^{-1}(q)<=F_{Delta}^{-1}(q)<=F_L^{-1}(q).{p_end}
@@ -83,16 +83,16 @@ Default is {cmd:num_quantiles(100)}{p_end}
 {title: "The limits of self-commitment and private paternalism"}
 
 {p 4 8}Setup{p_end}
-{p 8 8}{cmd:. use limmit_commitment.dta, clear}{p_end}
+{p 8 8}{stata "use limits_commitment.dta, clear"}{p_end}
 
 {p 4 8}Average treatment effect{p_end}
-{p 8 8}{cmd:. regress apr treat, robust}{p_end}
+{p 8 8}{stata "regress apr treat, robust"}{p_end}
 
 {p 4 8}Bounds for the treatment effect{p_end}
-{p 8 8}{cmd:. fan_park apr treat}{p_end}
+{p 8 8}{stata "fan_park apr treat"}{p_end}
 
 {p 4 8}Bounds for the quantile-treatment effect{p_end}
-{p 8 8}{cmd:. fan_park apr treat, qbounds}{p_end}
+{p 8 8}{stata "fan_park apr treat, qbounds"}{p_end}
 
 {title: Simulation Example}
 

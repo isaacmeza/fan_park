@@ -1,0 +1,12 @@
+v 3
+d STATA Package: FAN_PARK
+d 
+d Authors: Isaac Meza Lopez, CIE, ITAM, isaac.meza@berkeley.edu
+d          
+d
+d Distribution-Date: 20220519
+d 
+f fan_park.ado
+f fan_park.sthlp
+f limits_commitment.dta
+d
