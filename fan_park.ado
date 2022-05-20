@@ -326,9 +326,9 @@ program fan_park, rclass
 		}
 		
 		*Properly define quantile function
-		sort quant_1 apr
+		sort quant_1 `var'
 		by quant_1 : replace quant_1 = . if _n!=_N
-		sort quant_0 apr
+		sort quant_0 `var'
 		by quant_0 : replace quant_0 = . if _n!=_N
 		
 		gen quant_0_ls = .
