@@ -32,7 +32,7 @@
 {marker description}{...}
 {title:Description}
 
-{p 4 8}{cmd:fan_park} implements nonparametric estimators of sharp bounds on the distribution of treatment effects of a binary treatment developed in {browse "https://doi.org/10.1017/S0266466609990168":Fan, and Park (2009)}, and provides inference for this bounds.{p_end}
+{p 4 8}{cmd:fan_park} implements nonparametric estimators, and inference, of sharp bounds on the distribution of treatment effects of a binary treatment developed in {browse "https://doi.org/10.1017/S0266466609990168":Fan, and Park (2009)}.{p_end}
 
 {p 8 8} Let Delta = Y_1-Y_0 denote the treatment effect or outcome gain, and F_{Delta}(.) its distribution function. Given the marginals F_1 and F_0 we can compute sharp bounds on the distribution of Delta for each x in the support of F_{Delta}, that is : F_L(x)<=F_{Delta}(x)<=F_U(x). Alternatively, when the option qbounds is given, {cmd:fan_park} computes bounds for the quantile function :  
 F_U^{-1}(q)<=F_{Delta}^{-1}(q)<=F_L^{-1}(q).{p_end}
