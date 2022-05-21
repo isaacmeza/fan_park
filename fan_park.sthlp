@@ -1,12 +1,12 @@
 {smcl}
 {* *!version 1.0.1  2022-04-30}{...}
-{viewerjumpto "Syntax" "rdrobust##syntax"}{...}
-{viewerjumpto "Description" "rdrobust##description"}{...}
-{viewerjumpto "Options" "rdrobust##options"}{...}
-{viewerjumpto "Examples" "rdrobust##examples"}{...}
-{viewerjumpto "Stored results" "rdrobust##stored_results"}{...}
-{viewerjumpto "References" "rdrobust##references"}{...}
-{viewerjumpto "Authors" "rdrobust##authors"}{...}
+{viewerjumpto "Syntax" "fan_park##syntax"}{...}
+{viewerjumpto "Description" "fan_park##description"}{...}
+{viewerjumpto "Options" "fan_park##options"}{...}
+{viewerjumpto "Examples" "fan_park##examples"}{...}
+{viewerjumpto "Stored results" "fan_park##stored_results"}{...}
+{viewerjumpto "References" "fan_park##references"}{...}
+{viewerjumpto "Authors" "fan_park##authors"}{...}
 
 {title:Title}
 
