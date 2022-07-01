@@ -109,7 +109,7 @@ Default is {cmd:num_quantiles(100)}{p_end}
 {p2col 5 20 24 2: Matrices}{p_end}
 {synopt:{cmd:r(bounds)}}matrix of size (n X 2) where n denotes the number of points where the bounds are computed. The first column stores the estimated lower bound, while the second column stores the upper bound at each of the points. If option {cmd:qbounds} is provided {cmd:r(bounds)} stores the quantile bounds.{p_end}
 {synopt:{cmd:r(sigma_2)}}matrix of size (n X 2). First column denotes the estimated variance for the lower bound at each of the points provided, and the second column stores the estimated variance for the upper bound.{p_end}
-{synopt:{cmd:r(M_delta)}}matrix of size (n X 2). First column stores M(delta) = sup{F_1(y)-F_0(y-delta)}, and second column stores m(delta) = inf{F_1(y)-F_0(y-delta)}. For further details, see ({browse "https://doi.org/10.1017/S0266466609990168":Fan, and Park (2009)}) {p_end}
+{synopt:{cmd:r(M_delta)}}matrix of size (n X 2). First column stores M(delta) = sup{F_1(y)-F_0(y-delta)}, and second column stores m(delta) = inf{F_1(y)-F_0(y-delta)}. For further details, see Fan, and Park (2009). {p_end}
 {synopt:{cmd:r(delta_val)}}matrix of size (n X 1). Stores the points in the support of (Y_1-Y_0) where the bounds are computed{p_end}
 {synopt:{cmd:r(q_val)}}matrix of size (n X 1). Stores the quantiles used to compute the q-bounds.{p_end}
 
