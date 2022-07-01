@@ -59,7 +59,7 @@ Default is {cmd:delta_partition(100)}.{p_end}
 {p 4 8}{cmd:delta_values(}{it:numlist}{cmd:)} specifies the points (x) where the bounds are computed. If this option is specified, then it supercedes the option {cmd:delta_partition(}{it:#}{cmd:)}.{p_end}
 
 {p 4 8}{cmd:cov_partition(}{it:#}{cmd:)}, when covariates are provided, it specifies the number of clusters in a kmedians algorithm to partition the covariate space. Covariates are used to tighten the bounds. 
-Default is {cmd:delta_partition(100)}{p_end}
+Default is {cmd:cov_partition(6)}{p_end}
 
 {p 4 8}{cmd:level(}{it:#}{cmd:)} specifies the significance level for the confidence intervals.
 Default is {cmd:level(95)}{p_end}
