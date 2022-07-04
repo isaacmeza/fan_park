@@ -286,7 +286,7 @@ program fan_park, rclass
 				(rarea ub_l10 ub_h10 `delta_val'1, color(maroon%35)) ///
 				(line `lb' `delta_val'1, xline(0, lpattern(dot) lcolor(gs5)) color(navy)) ///
 				(line `ub' `delta_val'1, color(maroon)) ///
-				, graphregion(color(white)) legend(order(5 "Lower bound" 6 "Upper bound")) ///
+				, graphregion(color(white)) legend(order(5 "Lower bound" 6 "Upper bound") rows(1) pos(6)) ///
 				xtitle("{&Delta} : Treatment effect")
 			
 			restore
@@ -476,7 +476,7 @@ program fan_park, rclass
 		if "`nograph'"=="" {	
 
 			noi twoway (line `ub' `q_val'1, color(navy) lwidth(medthick) yline(0, lpattern(dot) lcolor(gs5))) (line `lb' `q_val'1, color(maroon) lwidth(medthick)) ///
-				, graphregion(color(white)) legend(order(1 "Upper bound" 2 "Lower bound")) ///
+				, graphregion(color(white)) legend(order(1 "Upper bound" 2 "Lower bound") rows(1) pos(6)) ///
 				ytitle("{&Delta} : Treatment effect") xtitle("Quantiles")
 		}	
 		
