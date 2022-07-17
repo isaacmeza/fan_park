@@ -2,7 +2,7 @@
 cap program drop fan_park
 program fan_park, rclass
 	version 17.0
-	syntax varlist(min=2) [, delta_partition(integer 100) Delta_values(numlist ascending) cov_partition(integer 6) level(integer 95) Nograph seed(integer 1) Qbounds num_quantiles(integer 100)] 
+	syntax varlist(min=2) [if] [in] [, delta_partition(integer 100) Delta_values(numlist ascending) cov_partition(integer 6) level(integer 95) Nograph seed(integer 1) Qbounds num_quantiles(integer 100)] 
 	
 	marksample touse
 	gettoken var rest : varlist
