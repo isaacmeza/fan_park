@@ -102,7 +102,7 @@ Default is {cmd:num_quantiles(100)}{p_end}
 {marker stored_results}{...}
 {title:Stored results}
 
-{p 4 8}{cmd:rdrobust} stores the following in {cmd:r()}:
+{p 4 8}{cmd:fan_park} stores the following in {cmd:r()}:
 
 {synoptset 20 tabbed}{...}
 
