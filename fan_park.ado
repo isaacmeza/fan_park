@@ -1,4 +1,5 @@
-*! version 1.0.1  30apr2022
+
+*! version 1.0.2  10oct2025
 cap program drop fan_park
 program fan_park, rclass
 	version 17.0
@@ -11,9 +12,15 @@ program fan_park, rclass
 	*Check factor variable
     _fv_check_depvar `var'
 	
-	tempname bounds sigma_2 M_delta bounds_cond sigma_2_cond delta_val _clus_1 lb ub sigma_l_2 sigma_u_2 bounds_q bounds_q_cond q_val
-	tempvar delta_range 
-	
+	capture assert inlist(`treat',0,1) if `touse'
+	if _rc {
+		di as err "fan_park: the treatment variable must be coded numeric 0/1 within the estimation sample."
+		exit 498
+	}
+
+	tempname bounds sigma_2 M_delta bounds_cond sigma_2_cond delta_val bounds_q bounds_q_cond q_val ///
+			bounds_cond_ss M_delta_cond M_active
+	tempvar _clus_1 M_active_L M_active_U delta_range lb ub sigma_l_2 sigma_u_2
 
 	qui {
 	
@@ -78,9 +85,16 @@ program fan_park, rclass
 		matrix `bounds' = J(`delta_partition', 2, .) 
 		matrix `sigma_2' = J(`delta_partition', 2, .) 
 		matrix `M_delta' = J(`delta_partition', 2, .) 
-
+		matrix `M_delta_cond' = J(`delta_partition', 2, .)
 		matrix `bounds_cond' = J(`delta_partition', 2, 0) 
 		matrix `sigma_2_cond' = J(`delta_partition', 2, 0) 
+
+		* keep squares of conditional bounds to build the between-X variance
+		matrix `bounds_cond_ss' = J(`delta_partition', 2, 0)
+
+		* sample-size scaling 
+		local N_tot = `n1_' + `n0_'
+		local n1_over_N = `n1_'/`N_tot'
 
 		noi di " "
 		noi _dots 0, title(Loop through delta values) reps(`delta_partition')
@@ -152,66 +166,126 @@ program fan_park, rclass
 			
 			if "`indeps'"!="" {
 					* conditional
+				local wsum = 0	
 				forvalues c = 1/`cov_partition' {
 					preserve
-					gen `var'_s = `var' + `delta' if `touse' & `treat'==0
-					
-					*ECDF
-					cumul `var' if `touse' & `treat'==1 & `_clus_1'==`c', gen(`var'_1)
-					cumul `var'_s if `touse' & `treat'==0 & `_clus_1'==`c', gen(`var'_0_s)
-					stack  `var'_1 `var'  `var'_0_s `var'_s, into(c `var'_) wide clear
-					keep if !missing(`var'_1) | !missing(`var'_0_s)	
-					sort `var'_
-					
-					* Interpolate
-					ipolate `var'_1 `var'_, gen(F_1) epolate
-					ipolate `var'_0_s `var'_, gen(F_0_s) epolate
-					
-					replace F_0_s = 0 if F_0_s<0
-					replace F_1 = 0 if F_1<0
-					replace F_0_s = 1 if F_0_s>1
-					replace F_1 = 1 if F_1>1
-					
-					* Lambda calculation from Assumption 1
-					count if _stack==1
-					local n1_c = `r(N)'
-					count if _stack==2
-					local n0_c = `r(N)'
-					
-					* F_1(y)-F_0(y-\delta)
-					gen double dif = F_1-F_0_s
-					* Y_\delta = [a,b] \cap [c+\delta, d+\delta]
-					local mn = max(`a_', `c_'+`delta')
-					local Mx = min(`b_', `d_'+ `delta')
 
-					* sup_{Y_\delta} {F_1(y)-F_0(y-\delta)}  (resp. inf)
+					* ---- (A) Get cell sizes and propensities 
+					count if `touse' & `treat'==1 & `_clus_1'==`c'
+					local n1_c = `r(N)'
+					count if `touse' & `treat'==0 & `_clus_1'==`c'
+					local n0_c = `r(N)'
+					local n_c  = `n1_c' + `n0_c'
+					if (`n1_c'==0 | `n0_c'==0) {   // skip cells that violate positivity
+						noi di as txt "note: some clusters had no treated or no control; reweighted among remaining cells."
+						restore
+						continue
+					}
+					local pi1_c = `n1_c'/`n_c'
+					local pi0_c = `n0_c'/`n_c'
+
+					* cell-specific supports
+					su `var' if `touse' & `treat'==1 & `_clus_1'==`c', meanonly
+					local a_c = r(min)
+					local b_c = r(max)
+					su `var' if `touse' & `treat'==0 & `_clus_1'==`c', meanonly
+					local c_c = r(min)
+					local d_c = r(max)
+
+					* ---- (B) Now build ECDFs in this cell and STACK 
+					gen `var'_s = `var' + `delta' if `touse' & `treat'==0
+
+					*ECDF conditional on cell c
+					cumul `var'   if `touse' & `treat'==1 & `_clus_1'==`c', gen(`var'_1)
+					cumul `var'_s if `touse' & `treat'==0 & `_clus_1'==`c', gen(`var'_0_s)
+
+					stack `var'_1 `var'  `var'_0_s `var'_s, into(c `var'_) wide clear
+					keep if !missing(`var'_1) | !missing(`var'_0_s)
+					sort `var'_
+
+					* Interpolate CDFs
+					ipolate `var'_1  `var'_, gen(F_1)   epolate
+					ipolate `var'_0_s `var'_, gen(F_0_s) epolate
+					replace F_0_s = 0 if F_0_s<0
+					replace F_1   = 0 if F_1<0
+					replace F_0_s = 1 if F_0_s>1
+					replace F_1   = 1 if F_1>1
+
+					* Objective: F_1(y) - F_0(y - δ) over Y_δ = [a,b] ∩ [c+δ, d+δ]
+					gen double dif = F_1 - F_0_s
+					local mn = max(`a_c', `c_c' + `delta')
+					local Mx = min(`b_c', `d_c' + `delta')
+
 					cap drop nobs
 					gen nobs = _n
 					su dif if inrange(`var'_,`mn',`Mx')
-					
+
 					if `r(N)'!=0 {
-						gen double Mdelta = `r(max)'
-						gen double mdelta = `r(min)'
-						
-					* ysup_d = argsup_{Y_\delta} {F_1(y)-F_0(y-\delta)}  
-					su nobs if abs(dif-Mdelta)<1e-10
-					local ysup_d = `r(min)'
-					* sigma^L^2 = F_1(ysup_d)[1-F_1(ysup_d)]+(n1/n0)F_0(ysup_d-delta)[1-F_0(ysup_d-delta)]
-					matrix `sigma_2_cond'[`i',1] = `sigma_2_cond'[`i',1] + freq[`c',1]*(F_1[`ysup_d']*(1-F_1[`ysup_d'])+(`n1_c'/`n0_c')*F_0_s[`ysup_d']*(1-F_0_s[`ysup_d']))
-					
-					* yinf_d = argsinf_{Y_\delta} {F_1(y)-F_0(y-\delta)}  
-					su nobs if abs(dif-mdelta)<1e-10
-					local yinf_d = `r(min)'
-					* sigma^U^2 = F_1(yinf_d)[1-F_1(yinf_d)]+(n1/n0)F_0(yinf_d-delta)[1-F_0(yinf_d-delta)]
-					matrix `sigma_2_cond'[`i',2] = `sigma_2_cond'[`i',2] + freq[`c',1]*(F_1[`yinf_d']*(1-F_1[`yinf_d'])+(`n1_c'/`n0_c')*F_0_s[`yinf_d']*(1-F_0_s[`yinf_d']))
-					
-						*F^L(\delta)
-						cap matrix `bounds_cond'[`i',1] = `bounds_cond'[`i',1] + freq[`c',1]*max(Mdelta[1],0)
-						*F^U(\delta)
-						cap matrix `bounds_cond'[`i',2] = `bounds_cond'[`i',2] + freq[`c',1]*(1 + min(mdelta[1],0))
+						local wsum = `wsum' + el(freq,`c',1)
+
+						* Sup/inf and argmax/argmin indices
+						local Mmax = `r(max)'
+						local Mmin = `r(min)'
+						su nobs if abs(dif-`Mmax')<1e-10
+						local ysup_d = `r(min)'
+						su nobs if abs(dif-`Mmin')<1e-10
+						local yinf_d = `r(min)'
+
+						* Within‑cell variance terms (scale by n1/N so CI uses sqrt(n1))
+						matrix `sigma_2_cond'[`i',1] = `sigma_2_cond'[`i',1] ///
+							+ freq[`c',1]*`n1_over_N'*( F_1[`ysup_d']*(1-F_1[`ysup_d'])/`pi1_c' ///
+							+ F_0_s[`ysup_d']*(1-F_0_s[`ysup_d'])/`pi0_c' )
+
+						matrix `sigma_2_cond'[`i',2] = `sigma_2_cond'[`i',2] ///
+							+ freq[`c',1]*`n1_over_N'*( F_1[`yinf_d']*(1-F_1[`yinf_d'])/`pi1_c' ///
+							+ F_0_s[`yinf_d']*(1-F_0_s[`yinf_d'])/`pi0_c' )
+
+						* Accumulate averaged bounds and their squares (for between‑X variance)
+						local LB_c = max(`Mmax',0)
+						local UB_c = 1 + min(`Mmin',0)
+						matrix `bounds_cond'[`i',1]    = `bounds_cond'[`i',1]    + freq[`c',1]*`LB_c'
+						matrix `bounds_cond'[`i',2]    = `bounds_cond'[`i',2]    + freq[`c',1]*`UB_c'
+						matrix `bounds_cond_ss'[`i',1] = `bounds_cond_ss'[`i',1] + freq[`c',1]*(`LB_c'^2)
+						matrix `bounds_cond_ss'[`i',2] = `bounds_cond_ss'[`i',2] + freq[`c',1]*(`UB_c'^2)
+
+						matrix `M_delta_cond'[`i',1] = el(`M_delta_cond',`i',1) + el(freq,`c',1)*`Mmax'
+						matrix `M_delta_cond'[`i',2] = el(`M_delta_cond',`i',2) + el(freq,`c',1)*`Mmin'
+
 					}
 					restore
 				}
+
+				if (`wsum'>0) {
+					matrix `bounds_cond'[`i',1]    = el(`bounds_cond',`i',1)/`wsum'
+					matrix `bounds_cond'[`i',2]    = el(`bounds_cond',`i',2)/`wsum'
+					matrix `bounds_cond_ss'[`i',1] = el(`bounds_cond_ss',`i',1)/`wsum'
+					matrix `bounds_cond_ss'[`i',2] = el(`bounds_cond_ss',`i',2)/`wsum'
+					matrix `sigma_2_cond'[`i',1]   = el(`sigma_2_cond',`i',1)/`wsum'
+					matrix `sigma_2_cond'[`i',2]   = el(`sigma_2_cond',`i',2)/`wsum'
+					matrix `M_delta_cond'[`i',1]   = el(`M_delta_cond',`i',1)/`wsum'
+					matrix `M_delta_cond'[`i',2]   = el(`M_delta_cond',`i',2)/`wsum'
+
+					* add Var_X( bound | δ ) scaled by n1/N
+					scalar Lbar = el(`bounds_cond',`i',1)
+					scalar Lss  = el(`bounds_cond_ss',`i',1)
+					scalar Ubar = el(`bounds_cond',`i',2)
+					scalar Uss  = el(`bounds_cond_ss',`i',2)
+
+					matrix `sigma_2_cond'[`i',1] = el(`sigma_2_cond',`i',1) + `n1_over_N'*(Lss - Lbar^2)
+					matrix `sigma_2_cond'[`i',2] = el(`sigma_2_cond',`i',2) + `n1_over_N'*(Uss - Ubar^2)
+				}
+
+				else {
+					matrix `bounds_cond'[`i',1]    = .
+					matrix `bounds_cond'[`i',2]    = .
+					matrix `bounds_cond_ss'[`i',1] = .
+					matrix `bounds_cond_ss'[`i',2] = .
+					matrix `sigma_2_cond'[`i',1]   = .
+					matrix `sigma_2_cond'[`i',2]   = .
+					matrix `M_delta_cond'[`i',1]   = .
+					matrix `M_delta_cond'[`i',2]   = .
+				}
+								
 			}
 				
 			noi _dots `i' 0	
@@ -224,16 +298,31 @@ program fan_park, rclass
 		svmat `bounds_cond'
 		svmat `sigma_2_cond'
 		svmat `delta_val'
-			
+		
+		gen `M_active_L' = `M_delta'1
+		gen `M_active_U' = `M_delta'2
+
 		if "`indeps'"!="" {
+			svmat `M_delta_cond'
+
+			replace `M_active_L' = `M_delta_cond'1 if `bounds_cond'1 > `bounds'1
+			replace `M_active_U' = `M_delta_cond'2 if `bounds_cond'2 < `bounds'2
+
 			*Bounds
 			gen `lb' = max(`bounds'1, `bounds_cond'1) if !missing(`bounds'1) & !missing(`bounds_cond'1)
 			replace `lb' = 1 if `lb'[_n-1]==1 & !missing(`lb')
 			gen `ub' = min(`bounds'2, `bounds_cond'2) if !missing(`bounds'2) & !missing(`bounds_cond'2)
 			replace `ub' = 1 if `ub'[_n-1]==1 & !missing(`ub')
 
-			gen `sigma_l_2' = min(`sigma_2'1,`sigma_2_cond'1) if !missing(`sigma_2'1) & !missing(`sigma_2_cond'1)
-			gen `sigma_u_2' = min(`sigma_2'2,`sigma_2_cond'2) if !missing(`sigma_2'2) & !missing(`sigma_2_cond'2)
+			replace `lb' = `bounds'1 if missing(`lb')
+			replace `ub' = `bounds'2 if missing(`ub')
+
+			* pick the s.e. that corresponds to the bound used at each δ
+			gen `sigma_l_2' = `sigma_2'1
+			replace `sigma_l_2' = `sigma_2_cond'1 if `bounds_cond'1 > `bounds'1
+
+			gen `sigma_u_2' = `sigma_2'2
+			replace `sigma_u_2' = `sigma_2_cond'2 if `bounds_cond'2 < `bounds'2
 
 			mkmat `lb' `ub' if `delta_val'1!=., matrix(`bounds')
 			mkmat `sigma_l_2' `sigma_u_2' if `delta_val'1!=., matrix(`sigma_2')
@@ -255,27 +344,27 @@ program fan_park, rclass
 			foreach signif in `=100-`level'' `=2*(100-`level')' {
 				*Lower CI
 				gen lb_l`signif' = `lb'
-				replace lb_l`signif' = lb_l`signif' - invnormal(1-`signif'/100)*sqrt(`sigma_l_2')/sqrt(`n1') if `M_delta'1<=0
-				replace lb_l`signif' = lb_l`signif' - invnormal(1-`signif'/200)*sqrt(`sigma_l_2')/sqrt(`n1') if `M_delta'1>0
+				replace lb_l`signif' = lb_l`signif' - invnormal(1-`signif'/100)*sqrt(`sigma_l_2')/sqrt(`n1') if `M_active_L'<=0
+				replace lb_l`signif' = lb_l`signif' - invnormal(1-`signif'/200)*sqrt(`sigma_l_2')/sqrt(`n1') if `M_active_L'>0
 				replace lb_l`signif' = 0 if lb_l`signif'<0
 				replace lb_l`signif' = 1 if lb_l`signif'>1
 
 				gen ub_l`signif' = `ub'
-				replace ub_l`signif' = ub_l`signif' - invnormal(1-`signif'/100)*sqrt(`sigma_u_2')/sqrt(`n1') if `M_delta'2>=0
-				replace ub_l`signif' = ub_l`signif' - invnormal(1-`signif'/200)*sqrt(`sigma_u_2')/sqrt(`n1') if `M_delta'2<0
+				replace ub_l`signif' = ub_l`signif' - invnormal(1-`signif'/100)*sqrt(`sigma_u_2')/sqrt(`n1') if `M_active_U'>=0
+				replace ub_l`signif' = ub_l`signif' - invnormal(1-`signif'/200)*sqrt(`sigma_u_2')/sqrt(`n1') if `M_active_U'<0
 				replace ub_l`signif' = 0 if ub_l`signif'<0
 				replace ub_l`signif' = 1 if ub_l`signif'>1
 
 				*Higher CI
 				gen lb_h`signif' = `lb'
-				replace lb_h`signif' = lb_h`signif' + invnormal(1-`signif'/100)*sqrt(`sigma_l_2')/sqrt(`n1') if `M_delta'1<=0
-				replace lb_h`signif' = lb_h`signif' + invnormal(1-`signif'/200)*sqrt(`sigma_l_2')/sqrt(`n1') if `M_delta'1>0
+				replace lb_h`signif' = lb_h`signif' + invnormal(1-`signif'/100)*sqrt(`sigma_l_2')/sqrt(`n1') if `M_active_L'<=0
+				replace lb_h`signif' = lb_h`signif' + invnormal(1-`signif'/200)*sqrt(`sigma_l_2')/sqrt(`n1') if `M_active_L'>0
 				replace lb_h`signif' = 0 if lb_h`signif'<0
 				replace lb_h`signif' = 1 if lb_h`signif'>1
 
 				gen ub_h`signif' = `ub'
-				replace ub_h`signif' = ub_h`signif' + invnormal(1-`signif'/100)*sqrt(`sigma_u_2')/sqrt(`n1') if `M_delta'2>=0
-				replace ub_h`signif' = ub_h`signif' + invnormal(1-`signif'/200)*sqrt(`sigma_u_2')/sqrt(`n1') if `M_delta'2<0
+				replace ub_h`signif' = ub_h`signif' + invnormal(1-`signif'/100)*sqrt(`sigma_u_2')/sqrt(`n1') if `M_active_U'>=0
+				replace ub_h`signif' = ub_h`signif' + invnormal(1-`signif'/200)*sqrt(`sigma_u_2')/sqrt(`n1') if `M_active_U'<0
 				replace ub_h`signif' = 0 if ub_h`signif'<0
 				replace ub_h`signif' = 1 if ub_h`signif'>1
 			}
@@ -291,11 +380,19 @@ program fan_park, rclass
 			
 			restore
 		}
-		
+
+		mkmat `lb' `ub' if `delta_val'1!=., matrix(`bounds')
+		mkmat `M_active_L' `M_active_U' if `delta_val'1!=., matrix(`M_active')
+		matrix colnames `M_active' = M_L_active M_U_active
+		matrix colnames `bounds'  = LB UB
+		matrix colnames `sigma_2' = Var_L Var_U
+		matrix colnames `M_delta' = M_L M_U
+
 		*Return
 		return matrix bounds = `bounds'
 		return matrix sigma_2 = `sigma_2'
 		return matrix M_delta = `M_delta'
+		return matrix M_active = `M_active'
 		return matrix delta_val = `delta_val'
 	}
 	
@@ -314,7 +411,7 @@ program fan_park, rclass
 			replace quant_1 = round(quant_1*(100/`r(N)'))
 		}
 		else {
-			xtile quant_1 = `var' if `treat'==1, nq(`num_quantiles')
+			xtile quant_1 = `var' if `touse' & `treat'==1, nq(`num_quantiles')
 		}
 		count if `touse' & `treat'==0
 		if `r(N)'<100 {
